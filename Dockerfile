@@ -1,35 +1,33 @@
-# Use the official Golang image for building the application
+# Stage 1: Build
 FROM golang:1.20 AS builder
 
-# Set the working directory inside the container
-WORKDIR /app
+# Set the working directory inside the builder container
+WORKDIR /codegirlai
 
-# Copy the Go modules manifests
+# Copy Go module manifests and download dependencies
 COPY go.mod go.sum ./
-
-# Download Go module dependencies
 RUN go mod download
 
-# Copy the application code
+# Copy the rest of the application source code
 COPY . ./
 
 # Build the Go application
 RUN go build -o codegirlai main.go
 
-# Use a minimal base image for running the application
+# Stage 2: Runtime
 FROM debian:bullseye-slim
 
-# Set the working directory for the runtime
-WORKDIR /app
+# Set the working directory inside the runtime container
+WORKDIR /codegirlai
 
-# Copy the compiled Go binary from the builder
-COPY --from=builder /app/codegirlai /app/codegirlai
+# Copy the compiled binary from the builder stage
+COPY --from=builder /codegirlai/codegirlai /codegirlai/codegirlai
 
-# Copy static files
-COPY static ./static
+# Copy the static directory
+COPY --from=builder /codegirlai/static /codegirlai/static
 
-# Expose the port the application listens on
-EXPOSE 9000
+# Expose port 80 for the application
+EXPOSE 80
 
 # Command to run the application
-CMD ["/app/codegirlai"]
+CMD ["/codegirlai/codegirlai", "-port", "80"]
