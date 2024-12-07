@@ -174,8 +174,11 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+        const wsUrl = `${protocol}${window.location.host}/ws?username=${username}`;
+
         // Connect to WebSocket server with username
-        ws = new WebSocket(`ws://starfish-app-oo5p7.ondigitalocean.app/ws?username=${username}`);
+        ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
             console.log(`Connected to the WebSocket server as: ${username}`);
