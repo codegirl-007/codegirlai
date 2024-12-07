@@ -17,7 +17,7 @@ COPY main.go ./
 COPY static ./static
 
 # Expose the application port
-EXPOSE 9000
+EXPOSE 80
 
 # Build the Go application
 RUN go build -o codegirlai main.go
