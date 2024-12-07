@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Chat Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f4;
+        }
+
+        .chat-container {
+            width: 400px;
+            background: #fff;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            background: #0078d4;
+            color: #fff;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .chat-box {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+            border-bottom: 1px solid #ccc;
+        }
+
+        .chat-box .message {
+            margin-bottom: 10px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            background: #f0f0f0;
+            color: #000;
+        }
+
+        .chat-box .message.sent {
+            background: #0078d4;
+            color: #fff;
+            align-self: flex-end;
+        }
+
+        .chat-box .sender {
+            font-weight: bold;
+            color: #0078d4;
+            cursor: pointer;
+        }
+
+        .chat-box .sender:hover {
+            text-decoration: underline;
+        }
+
+        .chat-input {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            border-top: 1px solid #ccc;
+        }
+
+        .chat-input input, .chat-input button {
+            font-size: 16px;
+            padding: 10px;
+        }
+
+        .chat-input button {
+            background: #0078d4;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        .chat-input button:hover {
+            background: #005bb5;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>Admin Chat Viewer</h1>
+        </div>
+        <div id="chat-box" class="chat-box"></div>
+        <div class="chat-input">
+            <input type="text" id="response-input" placeholder="Type a response..." />
+            <button id="send-button">Send</button>
+        </div>
+    </div>
+    <script>
+document.addEventListener("DOMContentLoaded", () => {
+    const ws = new WebSocket("ws://localhost:9000/ws?username=Codegirl");
+    const chatBox = document.getElementById("chat-box");
+    const responseInput = document.getElementById("response-input");
+    const sendButton = document.getElementById("send-button");
+    let selectedUser = null;
+    let connectedUsers = [];
+    let currentIndex = -1;
+
+    // Request permission for notifications
+    if ("Notification" in window) {
+        Notification.requestPermission()
+            .then((permission) => {
+                if (permission === "granted") {
+                    console.log("Notification permission granted.");
+                }
+            })
+            .catch((err) => {
+                console.error("Notification permission error:", err);
+            });
+    }
+
+    function appendMessage(sender, content, type) {
+        const messageDiv = document.createElement("div");
+        messageDiv.classList.add("message", type);
+
+        const senderSpan = document.createElement("span");
+        senderSpan.classList.add("sender");
+        senderSpan.textContent = sender;
+        senderSpan.title = `Click to reply to ${sender}`;
+        senderSpan.onclick = () => {
+            if (sender !== "Codegirl") {
+                selectedUser = sender;
+                responseInput.placeholder = `Replying to ${sender}`;
+            }
+        };
+
+        const contentSpan = document.createElement("span");
+        contentSpan.textContent = `: ${content}`;
+
+        messageDiv.appendChild(senderSpan);
+        messageDiv.appendChild(contentSpan);
+        chatBox.appendChild(messageDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function sendDesktopNotification(sender, content) {
+      console.log("send");
+                if (Notification.permission === "granted") {
+                  console.log("this");
+                    const notification = new Notification("New Message", {
+                        body: `${sender}: ${content}`,
+                        icon: "https://via.placeholder.com/128", // Add a custom icon if desired
+                    });
+
+                    notification.onclick = () => {
+                        window.focus();
+                    };
+                }
+            }
+
+    ws.onopen = () => {
+        console.log("Connected to the WebSocket server as Codegirl.");
+    };
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "user_list") {
+            connectedUsers = data.users.filter((user) => user !== "Codegirl");
+            if (currentIndex === -1 && connectedUsers.length > 0) {
+                currentIndex = 0;
+                selectedUser = connectedUsers[currentIndex];
+                responseInput.placeholder = `Replying to ${selectedUser}`;
+            }
+        } else if (data.type === "new_user") {
+            // Notify admin about the new user
+            appendMessage("System", data.content, "received");
+        } else if (data.type === "message" && data.sender !== "Codegirl") {
+            appendMessage(data.sender, data.content, "received");
+
+             // Send desktop notification
+             if (data.sender !== "Codegirl") {
+                  sendDesktopNotification(data.sender, data.content);
+              }
+        }
+    };
+
+    ws.onclose = () => {
+        console.log("WebSocket connection closed.");
+        appendMessage("System", "Disconnected from server.", "received");
+    };
+
+    ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+    };
+
+    function sendMessage() {
+        const message = responseInput.value.trim();
+        if (message && selectedUser) {
+            ws.send(JSON.stringify({ type: "message", content: message, receiver: selectedUser }));
+            appendMessage("You", `to ${selectedUser}: ${message}`, "sent");
+            responseInput.value = "";
+        } else if (!selectedUser) {
+            alert("No user selected to reply to.");
+        }
+    }
+
+    responseInput.addEventListener("input", () => {
+        if (selectedUser) {
+            ws.send(JSON.stringify({ type: "typing", sender: "Codegirl", receiver: selectedUser }));
+        }
+    });
+
+    sendButton.addEventListener("click", sendMessage);
+    responseInput.addEventListener("keypress", (event) => {
+        if (event.key === "Enter") {
+            sendMessage();
+        }
+    });
+});
+
+    </script>
+</body>
+</html>

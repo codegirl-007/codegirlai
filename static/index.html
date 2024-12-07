@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f4;
+        }
+
+        .login-container, .chat-container {
+            width: 1200px;
+            background: #fff;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 800px;
+        }
+
+        .login-header, .chat-header {
+            background: #708ca1;
+            color: #fff;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .login-body {
+            padding: 20px;
+            text-align: center;
+        }
+
+        .login-body input, .login-body button {
+            font-size: 16px;
+            padding: 10px;
+            margin: 5px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .chat-box {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+            border-bottom: 1px solid #ccc;
+            min-height: 500px;
+        }
+
+        .chat-box .message {
+            margin-bottom: 10px;
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+
+        .chat-box .message.sent {
+            background: #ced3d6;
+            color: #000;
+            align-self: flex-end;
+        }
+
+        .chat-box .message.received {
+            background: #f0f0f0;
+            color: #000;
+            align-self: flex-start;
+        }
+
+        .typing-indicator {
+            font-style: italic;
+            color: gray;
+            padding: 5px 10px;
+        }
+
+        .chat-input {
+          display: flex;
+          flex-direction: column; /* Stack the input and button vertically */
+          align-items: stretch;   /* Make both elements stretch to fill the container */
+          gap: 10px;
+          padding: 10px;
+          border-top: 1px solid #ccc;
+        }
+
+        .chat-input input {
+          font-size: 16px;
+          padding: 10px;
+          width: 100%; /* Full width of the container */
+          box-sizing: border-box;
+        }
+
+        .chat-input button {
+          background: #708ca1;
+          color: white;
+          border: none;
+          cursor: pointer;
+          padding: 10px 20px;
+          font-size: 16px;
+          width: 100%; /* Full width of the container */
+        }
+
+        .chat-input button:hover {
+          background: #708ca1;
+        }
+
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div class="login-container" id="login-screen">
+        <div class="login-header">
+            <h1>Login</h1>
+        </div>
+        <div class="login-body">
+            <input type="text" id="username-input" placeholder="Enter your username" />
+            <button id="login-button">Join Chat</button>
+        </div>
+    </div>
+
+    <!-- Chat Screen -->
+    <div class="chat-container" id="chat-screen" style="display: none;">
+        <div class="chat-header">
+            <h1>Codegirl AI</h1>
+        </div>
+        <div id="chat-box" class="chat-box"></div>
+        <div id="typing-indicator" class="typing-indicator" style="display: none;">Codegirl is typing...</div>
+        <div class="chat-input">
+            <input type="text" id="message-input" placeholder="Type a message..." />
+            <button id="send-button">Send</button>
+        </div>
+    </div>
+
+    <script>
+document.addEventListener("DOMContentLoaded", () => {
+    const loginScreen = document.getElementById("login-screen");
+    const chatScreen = document.getElementById("chat-screen");
+    const usernameInput = document.getElementById("username-input");
+    const loginButton = document.getElementById("login-button");
+
+    const chatBox = document.getElementById("chat-box");
+    const typingIndicator = document.getElementById("typing-indicator");
+    const messageInput = document.getElementById("message-input");
+    const sendButton = document.getElementById("send-button");
+
+    let username = null;
+    let ws = null;
+    let typingTimeout;
+
+    function notifyAdminStatus(statusMessage) {
+        const notificationDiv = document.createElement("div");
+        notificationDiv.classList.add("message", "received");
+        notificationDiv.style.fontStyle = "italic";
+        notificationDiv.textContent = statusMessage;
+        chatBox.appendChild(notificationDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // Login Handler
+    loginButton.addEventListener("click", () => {
+        username = usernameInput.value.trim();
+        if (!username) {
+            alert("Username is required.");
+            return;
+        }
+
+        if (username.toLowerCase() === "codegirl") {
+            alert("You cannot log in as 'Codegirl'. Please choose a different username.");
+            return;
+        }
+
+        // Connect to WebSocket server with username
+        ws = new WebSocket(`ws://localhost:9000/ws?username=${username}`);
+
+        ws.onopen = () => {
+            console.log(`Connected to the WebSocket server as: ${username}`);
+            loginScreen.style.display = "none";
+            chatScreen.style.display = "flex";
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+
+            if (data.type === "admin_status") {
+                notifyAdminStatus(data.content);
+            } else if (data.type === "typing" && data.sender === "Codegirl") {
+                typingIndicator.style.display = "block";
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    typingIndicator.style.display = "none";
+                }, 1000);
+            } else if (data.type === "message") {
+                const messageDiv = document.createElement("div");
+                messageDiv.classList.add("message", "received");
+                messageDiv.textContent = `${data.sender}: ${data.content}`;
+                chatBox.appendChild(messageDiv);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        };
+
+        ws.onclose = () => {
+            console.log("WebSocket connection closed.");
+            const messageDiv = document.createElement("div");
+            messageDiv.classList.add("message", "received");
+            messageDiv.textContent = "Disconnected from server.";
+            chatBox.appendChild(messageDiv);
+        };
+
+        ws.onerror = (error) => {
+            console.error("WebSocket error:", error);
+        };
+    });
+
+    // Send a message
+    function sendMessage() {
+        const message = messageInput.value.trim();
+        if (message) {
+            ws.send(JSON.stringify({ type: "message", content: message, receiver: "Codegirl" }));
+            const messageDiv = document.createElement("div");
+            messageDiv.classList.add("message", "sent");
+            messageDiv.textContent = `You: ${message}`;
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            messageInput.value = "";
+        }
+    }
+
+    // Typing indicator
+    messageInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+            sendMessage();
+        } else {
+            ws.send(JSON.stringify({ type: "typing", sender: username, receiver: "Codegirl" }));
+        }
+    });
+
+    // Attach Send button event
+    sendButton.addEventListener("click", sendMessage);
+});
+
+    </script>
+</body>
+</html>
