@@ -193,7 +193,7 @@ func main() {
 	go handleMessages()
 
 	// Start the server
-	port := ":80"
+	port := ":9000"
 	fmt.Printf("Server started on http://localhost%s\n", port)
 	err := http.ListenAndServe(port, nil)
 	if err != nil {
