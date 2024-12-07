@@ -102,7 +102,11 @@
     </div>
     <script>
 document.addEventListener("DOMContentLoaded", () => {
-    const ws = new WebSocket("ws://starfish-app-oo5p7.ondigitalocean.app/ws?username=Codegirl");
+
+    const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+    const wsUrl = `${protocol}${window.location.host}/ws?username=Codegirl`;
+
+    const ws = new WebSocket(wsUrl);
     const chatBox = document.getElementById("chat-box");
     const responseInput = document.getElementById("response-input");
     const sendButton = document.getElementById("send-button");
