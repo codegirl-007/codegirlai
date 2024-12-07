@@ -175,7 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // Connect to WebSocket server with username
-        ws = new WebSocket(`ws://localhost:9000/ws?username=${username}`);
+        ws = new WebSocket(`ws://starfish-app-oo5p7.ondigitalocean.app/ws?username=${username}`);
 
         ws.onopen = () => {
             console.log(`Connected to the WebSocket server as: ${username}`);
